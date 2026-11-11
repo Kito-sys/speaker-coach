@@ -124,21 +124,81 @@ button:disabled{opacity:.5}
 
 <script>
 /* ---------- content ---------- */
-const ASSESS = [
-  {mode:"assess", sec:60, label:"משימה 1 מתוך 3: קריאה בקול", task:"Read this aloud, slowly and clearly.",
-   passage:"Thank you for being here this evening. Over the next thirty minutes, I want to share three things with you. First, why the body remembers what the mind tries to forget. Second, what really happens when we finally stop and listen. And third, one very simple practice you can use tonight, whether you believe in it or not."},
-  {mode:"assess", sec:75, label:"משימה 2 מתוך 3: דיבור חופשי", task:"In about one minute, tell me what your talk \"Magnetic Medicine\" is about, and who it is for."},
-  {mode:"assess", sec:60, label:"משימה 3 מתוך 3: שאלה מהקהל", task:"A woman in the audience asks: \"How is this different from everything else I have already tried?\" Answer her.", hear:true},
+const PASSAGES = [
+  "Thank you for being here this evening. Over the next thirty minutes, I want to share three things with you. First, why the body remembers what the mind tries to forget. Second, what really happens when we finally stop and listen. And third, one very simple practice you can use tonight, whether you believe in it or not.",
+  "Three years ago, a woman walked into my workshop and said she felt nothing. No pain, no joy, just a quiet weight on her chest. I asked her to breathe with me for thirty seconds. Then I asked her one question. What she answered changed the way I think about healing, and I would like to tell you why.",
+  "Most of us were taught to push through. To ignore the tired voice, the tight throat, the heavy shoulders. But the body is not the enemy of your work. It is the instrument of your work. When you learn to read its signals, everything you do becomes clearer, lighter, and far more honest.",
+  "Before we begin, I want you to notice where you are sitting. Feel the weight of your body in the chair. Notice your breath without changing it. This is the whole method in three sentences: stop, feel, and then choose. The rest of tonight is simply practice for those three words.",
+  "There is a difference between information and transformation. You can read a hundred books about swimming and still be afraid of the water. Tonight I will not give you another theory. I will give you one experience, and I trust that your own body will teach you the rest."
 ];
+const TALKS = [
+  "In about one minute, tell me what your talk \"Magnetic Medicine\" is about, and who it is for.",
+  "In one minute, describe one person who came to your work, and what changed for them.",
+  "In one minute, explain why you started doing this work. Give one concrete moment.",
+  "In one minute, tell me what people usually get wrong about healing, and what you believe instead.",
+  "In one minute, describe what the audience will feel and know at the end of your talk.",
+  "In one minute, teach me one small practice from your method, step by step.",
+  "In one minute, tell me about a time your own method surprised you."
+];
+const QUESTIONS = [
+  "How is this different from everything else I have already tried?",
+  "I am skeptical. Why should I believe this works?",
+  "How long does it take to feel a difference?",
+  "Is there any science behind what you are describing?",
+  "What if I try the practice and feel nothing at all?",
+  "Can I do this alone at home, or do I need you?",
+  "Who is this not right for?",
+  "What is the first thing I should do tomorrow morning?",
+  "How did you learn this, and who taught you?",
+  "My husband thinks this is nonsense. What would you say to him?",
+  "Can this replace seeing a doctor?",
+  "What was the hardest moment in your own journey with this?"
+];
+const OPENERS = [
+  "Hi. Let's warm up. Tell me about the last time you explained your work to someone new. What did you say?",
+  "Hi. Imagine you just walked on stage and the microphone is not working. What do you say to the audience?",
+  "Hi. Tell me about your morning today, as if it were the opening story of a talk.",
+  "Hi. Describe the room where you would love to give your first big talk abroad.",
+  "Hi. Tell me about a speaker you admire. What exactly do they do that you want to do?",
+  "Hi. A stranger at a conference asks what you do. Answer in three sentences, then I will ask more.",
+  "Hi. Tell me about a book or an idea that changed how you see the body.",
+  "Hi. What is one thing you believed five years ago and no longer believe?",
+  "Hi. Describe a small moment from this week that could become a story on stage.",
+  "Hi. What scares you most about speaking in English, and what would you do if it did not?"
+];
+const CHALLENGES = [
+  "start with a question to the audience.",
+  "start with one short sentence, then pause for three full seconds.",
+  "speak at half your normal speed.",
+  "use one concrete image the audience can see.",
+  "use no filler words. If one comes, stop and breathe instead.",
+  "end on your strongest sentence and stop. Do not add anything after it.",
+  "tell it as if to one person in the front row.",
+  "use the rule of three once: three short parallel phrases.",
+  "lower your voice on the most important sentence instead of raising it.",
+  "cut it to the essential. Fewer words, longer pauses."
+];
+function pick(key, arr){
+  store.recent = store.recent || {}; const used = store.recent[key] || [];
+  let pool = arr.filter(x => !used.includes(x)); if(!pool.length){ pool = arr.slice(); store.recent[key] = []; }
+  const x = pool[Math.floor(Math.random() * pool.length)];
+  store.recent[key] = (store.recent[key] || []).concat([x]).slice(-(arr.length - 1)); save(); return x;
+}
+function buildAssess(g){
+  return [
+    {mode:"assess", sec:60, label:"משימה 1 מתוך 3: קריאה בקול", task:"Read this aloud, slowly and clearly.", passage:g.passage},
+    {mode:"assess", sec:75, label:"משימה 2 מתוך 3: דיבור חופשי", task:g.talk},
+    {mode:"assess", sec:60, label:"משימה 3 מתוך 3: שאלה מהקהל", task:"A woman in the audience asks: \"" + g.question + "\" Answer her.", hear:true},
+  ];
+}
 const SEGMENTS = [
   {mode:"stage", sec:90,  he:"פתיחה", task:"Deliver the opening of your talk: your first 60 to 90 seconds on stage. Start with a hook, not with your name."},
   {mode:"stage", sec:150, he:"הסיפור שלי", task:"Tell the story of why you do this work. One moment, one scene, concrete details."},
   {mode:"stage", sec:150, he:"הרעיון המרכזי", task:"Explain the core idea of Magnetic Medicine so simply that a tired person in the last row understands it."},
   {mode:"stage", sec:90,  he:"הנחיית תרגול", task:"Guide the audience through one short practice. Slow down. Use pauses."},
   {mode:"stage", sec:75,  he:"סיום והזמנה", task:"Deliver your closing: the last message and the invitation to work with you. Land the final sentence."},
-  {mode:"qa",    sec:60,  he:"שאלות מהקהל", task:"An audience member asks: \"I am skeptical. Why should I believe this works?\" Answer in under one minute.", hear:true},
+  {mode:"qa",    sec:60,  he:"שאלות מהקהל", task:"Answer a different audience question each time, in under one minute.", hear:true},
 ];
-const LESSON_OPEN = "Hi. Let's warm up. Tell me about the last time you explained your work to someone new. What did you say?";
 const SCORE_HE = {fluency:"שטף", pronunciation:"הגייה", delivery:"קצב והגשה", structure:"מבנה וסיפור"};
 
 /* ---------- state ---------- */
@@ -244,6 +304,14 @@ async function api(b){
     const d = await firstThatWorks(m.text, [mk({thinkingConfig: {thinkingBudget: 0}}), mk({})]);
     const txt = textOf(d);
     try { return JSON.parse(txt); } catch(e) { throw new Error("BAD_REPLY " + (((d.candidates || [])[0] || {}).finishReason || "") + " " + txt.slice(0, 80)); }
+  }
+  if(b.action === "fresh"){
+    const d = await firstThatWorks(m.text, [{
+      systemInstruction: {parts: [{text: "You write practice material for a speaker rehearsing an English keynote about body awareness, healing and inner listening. Return only JSON."}]},
+      contents: [{role: "user", parts: [{text: "Create new practice material. Return JSON: {passage: a 55 to 70 word paragraph that sounds like part of a warm, calm keynote, in simple spoken English, with several th, r, w and v sounds and at least one short sentence, talk: a one-minute speaking prompt about her talk or her work that starts with 'In one minute,', question: one realistic question an audience member would ask, without quotation marks}. Make it clearly different in topic and wording from these recent ones: " + String(b.avoid || "none").slice(0, 1500)}]}],
+      generationConfig: {responseMimeType: "application/json", maxOutputTokens: 1200, temperature: 1.0},
+    }]);
+    return JSON.parse(textOf(d));
   }
   if(b.action === "summary"){
     const d = await firstThatWorks(m.text, [{
@@ -450,16 +518,24 @@ async function nextStep(){
 }
 function renderSegs(){
   const l = $("segList"); l.innerHTML = "";
-  SEGMENTS.forEach(s => { const b = document.createElement("button"); b.className = "mode"; b.innerHTML = "<b></b><span class='en' style='display:block'></span>"; b.children[0].textContent = s.he; b.children[1].textContent = s.task; b.onclick = () => { ctx(); startRun("stage", [s]); }; l.appendChild(b); });
+  SEGMENTS.forEach(s => { const b = document.createElement("button"); b.className = "mode"; b.innerHTML = "<b></b><span class='en' style='display:block'></span>"; b.children[0].textContent = s.he; b.children[1].textContent = s.task; b.onclick = () => { ctx(); startRun("stage", [Object.assign({}, s, s.mode === "qa" ? {task: "An audience member asks: \"" + pick("q", QUESTIONS) + "\" Answer in under one minute."} : {task: s.task + " This time: " + pick("c", CHALLENGES)})]); }; l.appendChild(b); });
 }
 
 /* ---------- wiring ---------- */
 document.querySelectorAll("[data-home]").forEach(b => b.onclick = goHome);
-document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = async () => {
   ctx(); clearErr(); const k = b.dataset.go;
-  if(k === "assess") startRun("assess", ASSESS);
+  if(k === "assess"){
+    const sp = b.querySelector("span"), old = sp.textContent; b.disabled = true; sp.textContent = "מכין משימות חדשות. כמה שניות.";
+    store.recent = store.recent || {}; let g = null;
+    try{ g = await api({action:"fresh", avoid:(store.recent.gen || []).join(" | ")}); }catch(e){}
+    if(g && g.passage && g.talk && g.question){ store.recent.gen = (store.recent.gen || []).concat([String(g.passage).slice(0, 70), g.talk, g.question]).slice(-18); save(); }
+    else g = {passage:pick("p", PASSAGES), talk:pick("t", TALKS), question:pick("q", QUESTIONS)};
+    b.disabled = false; sp.textContent = old;
+    startRun("assess", buildAssess(g));
+  }
   if(k === "stage"){ renderSegs(); show("stagePick"); }
-  if(k === "lesson"){ startRun("lesson", [{mode:"lesson", sec:60, task:LESSON_OPEN, hear:true}]); say(LESSON_OPEN); }
+  if(k === "lesson"){ const o = pick("o", OPENERS); startRun("lesson", [{mode:"lesson", sec:60, task:o, hear:true}]); say(o); }
 });
 $("recBtn").onclick = toggleRec;
 $("hearTask").onclick = () => say(cur.task, $("hearTask"));
