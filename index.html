@@ -199,8 +199,13 @@ const SCHEMA = {
 let modelCache = null;
 const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
 async function gfetch(path, body){
-  const r = await fetch(API + path, {method: body ? "POST" : "GET", headers: {"x-goog-api-key": getKey(), "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
-  const t = await r.text();
+  const ac = new AbortController(); const to = setTimeout(() => ac.abort(), body ? 45000 : 15000);
+  let r, t;
+  try {
+    r = await fetch(API + path, {method: body ? "POST" : "GET", headers: {"x-goog-api-key": getKey(), "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined, signal: ac.signal});
+    t = await r.text();
+  } catch(e) { throw new Error(e && e.name === "AbortError" ? "TIMEOUT " + path.split("/").pop().split(":")[0] : "NET " + (e && e.message || e)); }
+  finally { clearTimeout(to); }
   if(!r.ok) throw new Error((r.status === 400 && /API key/i.test(t)) || r.status === 401 || r.status === 403 ? "BAD_KEY" : ("HTTP " + r.status + " " + t.slice(0, 200)));
   return JSON.parse(t);
 }
@@ -219,7 +224,7 @@ async function firstThatWorks(list, bodies){
   let last = new Error("no model available");
   for(const m of list.slice(0, 3)) for(const body of bodies){
     try { return await gfetch("/models/" + m + ":generateContent", body); }
-    catch(e){ last = e; if(/BAD_KEY|429/.test(e.message)) throw e; }
+    catch(e){ last = e; if(/BAD_KEY|429|TIMEOUT|NET /.test(e.message)) throw e; }
   }
   throw last;
 }
@@ -231,12 +236,14 @@ async function api(b){
   if(b.action === "turn"){
     const mode = MODE[b.mode] ? b.mode : "stage";
     const ctxText = [MODE[mode], b.task ? "The task she was given: " + String(b.task).slice(0, 600) : "", b.focus ? "Her current training focus: " + String(b.focus).slice(0, 200) + ". Weight your feedback toward it." : "", b.history ? "Recent conversation (oldest first):\n" + String(b.history).slice(-2500) : ""].filter(Boolean).join("\n");
-    const d = await firstThatWorks(m.text, [{
+    const mk = extra => ({
       systemInstruction: {parts: [{text: COACH}]},
       contents: [{role: "user", parts: [{text: ctxText}, {inline_data: {mime_type: b.mime || "audio/wav", data: b.audio}}]}],
-      generationConfig: {responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 1800, temperature: 0.4},
-    }]);
-    return JSON.parse(textOf(d));
+      generationConfig: Object.assign({responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 4000, temperature: 0.4}, extra),
+    });
+    const d = await firstThatWorks(m.text, [mk({thinkingConfig: {thinkingBudget: 0}}), mk({})]);
+    const txt = textOf(d);
+    try { return JSON.parse(txt); } catch(e) { throw new Error("BAD_REPLY " + (((d.candidates || [])[0] || {}).finishReason || "") + " " + txt.slice(0, 80)); }
   }
   if(b.action === "summary"){
     const d = await firstThatWorks(m.text, [{
@@ -266,7 +273,9 @@ function showErr(e){
   else if(m.includes("BAD_KEY")){ openKey("המפתח שנשמר לא תקין. צריך להדביק מפתח חדש."); return; }
   else if(m.includes("429")) he = "המכסה החינמית של Gemini נגמרה לרגע. אפשר לנסות שוב בעוד דקה.";
   else if(m.includes("BAD_AUDIO")) he = "ההקלטה ריקה או ארוכה מדי. אפשר לנסות שוב.";
-  else if(m.includes("Failed to fetch")) he = "אין חיבור לשרת. כדאי לבדוק את האינטרנט ולנסות שוב.";
+  else if(m.includes("TIMEOUT")) he = "Gemini לא ענה בתוך 45 שניות. אפשר לנסות שוב עם הקלטה קצרה יותר. פרטים: " + m;
+  else if(m.includes("NET ")) he = "אין חיבור ל-Gemini. כדאי לבדוק את האינטרנט ולנסות שוב. פרטים: " + m;
+  else if(m.includes("BAD_REPLY")) he = "Gemini החזיר תשובה לא שלמה. אפשר לנסות שוב. פרטים: " + m;
   $("err").textContent = he; $("err").classList.remove("hide");
   window.scrollTo(0,0);
 }
@@ -376,7 +385,7 @@ async function toggleRec(){
   clearErr();
   if(!rec){
     stopPlay();
-    try{ await startRec(cur.sec); }catch(e){ showErr(new Error("אין גישה למיקרופון. צריך לאשר מיקרופון לדף הזה בהגדרות הדפדפן.")); return; }
+    try{ await startRec(cur.sec); }catch(e){ showErr(new Error("אין גישה למיקרופון. צריך לפתוח את הדף ב-Safari או ב-Chrome ולאשר מיקרופון. פרטים: " + (e && e.name || e))); return; }
     $("recBtn").classList.add("on"); $("recBtn").textContent = "סיימתי";
   } else { stopAndSend(); }
 }
@@ -385,6 +394,7 @@ async function stopAndSend(){
   $("recBtn").classList.remove("on"); $("recBtn").textContent = "להתחיל לדבר";
   if(a.sec < 2){ showErr(new Error("BAD_AUDIO")); return; }
   $("recCard").classList.add("hide"); $("busy").classList.remove("hide");
+  const w0 = Date.now(); const wt = setInterval(() => { $("busy").textContent = "המאמן מקשיב להקלטה. " + Math.round((Date.now()-w0)/1000) + " שניות (עד 45)."; }, 1000);
   try{
     const body = {action:"turn", mode:cur.mode, audio:a.b64, mime:"audio/wav", task:cur.task + (cur.passage ? " Passage: " + cur.passage : ""), focus:store.focus ? store.focus.focus : ""};
     if(runKind === "lesson" || cur.mode === "qa") body.history = lessonHist.join("\n");
@@ -395,6 +405,7 @@ async function stopAndSend(){
     if(runKind === "lesson" || cur.mode === "qa"){ lessonHist.push("Student: " + r.transcript, "Coach: " + r.coach_says); lessonHist = lessonHist.slice(-10); }
     say(r.coach_says);
   }catch(e){ $("busy").classList.add("hide"); $("recCard").classList.remove("hide"); showErr(e); }
+  finally{ clearInterval(wt); }
 }
 function renderResult(r){
   $("busy").classList.add("hide"); $("result").classList.remove("hide");
