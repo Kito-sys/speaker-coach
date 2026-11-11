@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>מאמן הבמה</title>
+<style>
+:root{--bg:#f6f3ee;--card:#fff;--ink:#1d1b2a;--mute:#6b6878;--line:#e4dfd6;--acc:#3b2f8f;--acc2:#e9e6fb;--ok:#1f7a4d;--warn:#b4541a;--rec:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:24px;margin:6px 0 2px}
+h2{font-size:19px;margin:0 0 8px}
+p{margin:0 0 10px}
+.sub{color:var(--mute);font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+.en{direction:ltr;text-align:left;unicode-bidi:isolate}
+button{font:inherit;border:0;border-radius:14px;padding:14px 16px;min-height:52px;cursor:pointer;background:var(--acc);color:#fff;width:100%;font-weight:600}
+button.sec{background:var(--acc2);color:var(--acc)}
+button.ghost{background:transparent;color:var(--acc);border:1px solid var(--line)}
+button.small{width:auto;min-height:40px;padding:8px 12px;font-size:15px;font-weight:500}
+button:disabled{opacity:.5}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.mode{display:block;text-align:right;background:var(--card);color:var(--ink);border:1px solid var(--line);margin:10px 0;font-weight:400}
+.mode b{display:block;font-size:18px;color:var(--acc)}
+.mode span{color:var(--mute);font-size:15px}
+#recBtn{width:150px;height:150px;border-radius:50%;margin:10px auto;display:block;font-size:18px}
+#recBtn.on{background:var(--rec)}
+.timer{text-align:center;font-size:28px;font-variant-numeric:tabular-nums;direction:ltr}
+.meter{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:8px 0}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .08s}
+.bar{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:15px}
+.bar label{width:92px}.bar .t{flex:1;height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar .t i{display:block;height:100%;background:var(--acc)}.bar b{width:26px;text-align:left}
+.fix{background:#fff6ea;border:1px solid #f1d9b8;border-radius:12px;padding:12px;margin:10px 0}
+.word{border-top:1px solid var(--line);padding:10px 0;display:flex;gap:10px;align-items:flex-start}
+.word:first-child{border-top:0}.word div{flex:1}
+.word b{font-size:18px}
+.err{background:#fdecea;border:1px solid #f3c2bd;color:#7a1f16;border-radius:12px;padding:12px;margin:12px 0}
+.hide{display:none!important}
+.passage{font-size:19px;line-height:1.7;background:#faf8ff;border-radius:12px;padding:12px}
+.hist{font-size:15px;border-top:1px solid var(--line);padding:8px 0}
+.spin{text-align:center;padding:26px 0;color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+  <h1>מאמן הבמה</h1>
+  <p class="sub">אימון הרצאה באנגלית. מדברים, המאמן מקשיב לקול ומחזיר משוב.</p>
+  <div id="err" class="err hide"></div>
+
+  <section id="keyScreen" class="hide">
+    <div class="card">
+      <h2>חיבור חד פעמי</h2>
+      <p id="keyMsg">כדי שהמאמן ישמע וידבר, צריך מפתח Gemini אישי. הוא חינמי ונשמר רק במכשיר הזה.</p>
+      <p>1. פותחים את הקישור ומתחברים עם חשבון גוגל.</p>
+      <p><a class="en" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></p>
+      <p>2. לוחצים Create API key ומעתיקים את המפתח.</p>
+      <p>3. מדביקים כאן ולוחצים שמירה.</p>
+      <input id="keyInput" class="en" type="password" autocomplete="off" placeholder="AIza..." style="width:100%;font:inherit;padding:14px;border:1px solid var(--line);border-radius:12px;margin:6px 0 12px">
+      <button id="keySave">שמירה ובדיקה</button>
+    </div>
+  </section>
+
+  <section id="home">
+    <div id="focusCard" class="card hide">
+      <h2>המיקוד לשבועיים הקרובים</h2>
+      <p class="en" id="focusName" style="font-weight:600"></p>
+      <p id="focusWhy"></p>
+      <p class="en sub" id="focusDrill"></p>
+    </div>
+    <button class="mode" data-go="assess"><b>מבחן פתיחה</b><span>3 משימות קצרות, כ-5 דקות. בסוף נבחר מיקוד אחד.</span></button>
+    <button class="mode" data-go="stage"><b>מצב במה</b><span>קטע מההרצאה ברצף, בלי הפרעות. משוב בסוף וחזרה על הקטע.</span></button>
+    <button class="mode" data-go="lesson"><b>מצב שיעור</b><span>שיחה חיה באנגלית. תיקון אחד בכל תור.</span></button>
+    <div class="card">
+      <h2>האימונים האחרונים</h2>
+      <div id="history" class="sub">עוד אין אימונים.</div>
+      <p class="sub" style="margin-top:10px">ההיסטוריה והמפתח נשמרים במכשיר הזה בלבד.</p>
+      <button class="ghost small" id="keyChange">החלפת מפתח</button>
+    </div>
+  </section>
+
+  <section id="stagePick" class="hide">
+    <div class="card"><h2>איזה קטע מתרגלים?</h2><div id="segList"></div></div>
+    <button class="ghost" data-home>חזרה</button>
+  </section>
+
+  <section id="session" class="hide">
+    <div class="card">
+      <p class="sub" id="stepLabel"></p>
+      <p class="en" id="taskText" style="font-weight:600"></p>
+      <p class="en passage hide" id="passage"></p>
+      <button class="sec small hide" id="hearTask">השמעת השאלה</button>
+    </div>
+    <div class="card" id="recCard">
+      <div class="timer" id="timer">0:00</div>
+      <div class="meter"><i id="level"></i></div>
+      <button id="recBtn">להתחיל לדבר</button>
+      <p class="sub" style="text-align:center" id="recHint"></p>
+    </div>
+    <div id="busy" class="card spin hide">המאמן מקשיב להקלטה. זה לוקח כמה שניות.</div>
+    <div id="result" class="hide">
+      <div class="card">
+        <h2>המאמן אומר</h2>
+        <p class="en" id="coachSays"></p>
+        <button class="sec small" id="hearCoach">השמעה חוזרת</button>
+        <div class="fix"><b>התיקון הכי חשוב</b><p class="en" id="topFix" style="margin:6px 0"></p><p id="heNote" style="margin:0"></p></div>
+        <div id="scores"></div>
+      </div>
+      <div class="card" id="pronCard"><h2>הגייה</h2><div id="pron"></div></div>
+      <div class="card"><h2>כך מרצה מנוסה היה אומר את זה</h2><p class="en" id="better"></p><button class="sec small" id="hearBetter">השמעה</button></div>
+      <div class="card"><h2>מה נשמע בהקלטה</h2><p class="en sub" id="transcript"></p></div>
+      <div class="row"><button class="sec" id="again">שוב על אותו קטע</button><button id="next">הבא</button></div>
+    </div>
+    <button class="ghost" style="margin-top:12px" data-home>סיום וחזרה לדף הראשי</button>
+  </section>
+
+  <section id="done" class="hide">
+    <div class="card"><h2>מבחן הפתיחה הסתיים</h2><div id="doneBody" class="spin">מסכם את התוצאות.</div></div>
+    <button data-home>לדף הראשי</button>
+  </section>
+</main>
+
+<script>
+/* ---------- content ---------- */
+const ASSESS = [
+  {mode:"assess", sec:60, label:"משימה 1 מתוך 3: קריאה בקול", task:"Read this aloud, slowly and clearly.",
+   passage:"Thank you for being here this evening. Over the next thirty minutes, I want to share three things with you. First, why the body remembers what the mind tries to forget. Second, what really happens when we finally stop and listen. And third, one very simple practice you can use tonight, whether you believe in it or not."},
+  {mode:"assess", sec:75, label:"משימה 2 מתוך 3: דיבור חופשי", task:"In about one minute, tell me what your talk \"Magnetic Medicine\" is about, and who it is for."},
+  {mode:"assess", sec:60, label:"משימה 3 מתוך 3: שאלה מהקהל", task:"A woman in the audience asks: \"How is this different from everything else I have already tried?\" Answer her.", hear:true},
+];
+const SEGMENTS = [
+  {mode:"stage", sec:90,  he:"פתיחה", task:"Deliver the opening of your talk: your first 60 to 90 seconds on stage. Start with a hook, not with your name."},
+  {mode:"stage", sec:150, he:"הסיפור שלי", task:"Tell the story of why you do this work. One moment, one scene, concrete details."},
+  {mode:"stage", sec:150, he:"הרעיון המרכזי", task:"Explain the core idea of Magnetic Medicine so simply that a tired person in the last row understands it."},
+  {mode:"stage", sec:90,  he:"הנחיית תרגול", task:"Guide the audience through one short practice. Slow down. Use pauses."},
+  {mode:"stage", sec:75,  he:"סיום והזמנה", task:"Deliver your closing: the last message and the invitation to work with you. Land the final sentence."},
+  {mode:"qa",    sec:60,  he:"שאלות מהקהל", task:"An audience member asks: \"I am skeptical. Why should I believe this works?\" Answer in under one minute.", hear:true},
+];
+const LESSON_OPEN = "Hi. Let's warm up. Tell me about the last time you explained your work to someone new. What did you say?";
+const SCORE_HE = {fluency:"שטף", pronunciation:"הגייה", delivery:"קצב והגשה", structure:"מבנה וסיפור"};
+
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+let store = {focus:null, sessions:[]};
+try { store = Object.assign(store, JSON.parse(localStorage.getItem("coach_v1") || "{}")); } catch(e){}
+const save = () => { try { localStorage.setItem("coach_v1", JSON.stringify(store)); } catch(e){} };
+let queue = [], qi = 0, cur = null, last = null, lessonHist = [], assessResults = [], runKind = "";
+
+/* ---------- Gemini, called straight from this device. The key is saved only in this browser. ---------- */
+const API = "https://generativelanguage.googleapis.com/v1beta";
+const getKey = () => { try { return localStorage.getItem("coach_key") || ""; } catch(e){ return ""; } };
+const COACH = `You are a world-class public speaking coach and English teacher for one student: a native Hebrew speaker and author who is becoming an international speaker. Her signature talk is called "Magnetic Medicine". Her target standard is a calm, authoritative, story-driven keynote speaker who makes complex ideas simple and speaks slowly with intention.
+You LISTEN to the audio itself. Judge what you actually hear: sounds, word stress, rhythm, pace, pauses, intonation, filler words, energy. Never invent problems you did not hear. If the audio is silent or unintelligible, say so in coach_says and give empty lists.
+Typical issues for Hebrew speakers to listen for: th sounds, r, w versus v, short versus long vowels (ship/sheep), final consonant clusters, word stress, flat or rising sentence endings, speaking too fast, translating Hebrew sentence structure.
+Be direct and specific. No flattery. Praise only what was truly strong, in one short phrase.
+Return ONLY JSON with these fields:
+transcript: exactly what she said.
+scores: integers 1-10 for fluency, pronunciation, delivery (pace, pauses, energy), structure (clarity, story, impact). 10 means an elite native keynote speaker.
+top_fix: the single most important thing to fix next attempt, one sentence in simple English.
+pronunciation: up to 5 items {word, heard, tip} for words that actually sounded off. tip is a short practical instruction.
+better_version: her same content rewritten the way a top native keynote speaker would say it. Keep her meaning and voice. Similar length.
+coach_says: what you say out loud to her now, in natural spoken English, maximum 60 words.
+hebrew_note: one short line in Hebrew (general plural or neutral phrasing, no dashes) explaining top_fix.`;
+const MODE = {
+  assess: "This is a baseline assessment task. Score strictly. coach_says should briefly acknowledge and move on.",
+  stage: "STAGE MODE. She delivered a segment of her talk without interruption. Judge it as a keynote segment: hook, clarity, story, pacing, pauses, landing the last line. coach_says gives the verdict and the one thing to redo.",
+  lesson: "LESSON MODE. This is a live conversation turn. In coach_says: first correct her one most important mistake briefly (say the correct form), then continue the conversation naturally and end with one question that makes her speak more. Keep it under 50 words.",
+  qa: "Q&A MODE. You asked her an audience question and she answered. Judge whether the answer was clear, confident and concise. In coach_says: give a one-line verdict, then ask the next realistic audience question about her talk.",
+};
+const SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    transcript: { type: "STRING" },
+    scores: {
+      type: "OBJECT",
+      properties: {
+        fluency: { type: "INTEGER" }, pronunciation: { type: "INTEGER" },
+        delivery: { type: "INTEGER" }, structure: { type: "INTEGER" },
+      },
+      required: ["fluency", "pronunciation", "delivery", "structure"],
+    },
+    top_fix: { type: "STRING" },
+    pronunciation: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { word: { type: "STRING" }, heard: { type: "STRING" }, tip: { type: "STRING" } },
+        required: ["word", "tip"],
+      },
+    },
+    better_version: { type: "STRING" },
+    coach_says: { type: "STRING" },
+    hebrew_note: { type: "STRING" },
+  },
+  required: ["transcript", "scores", "top_fix", "pronunciation", "better_version", "coach_says", "hebrew_note"],
+};
+let modelCache = null;
+const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+async function gfetch(path, body){
+  const r = await fetch(API + path, {method: body ? "POST" : "GET", headers: {"x-goog-api-key": getKey(), "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
+  const t = await r.text();
+  if(!r.ok) throw new Error((r.status === 400 && /API key/i.test(t)) || r.status === 401 || r.status === 403 ? "BAD_KEY" : ("HTTP " + r.status + " " + t.slice(0, 200)));
+  return JSON.parse(t);
+}
+async function models(){
+  if(modelCache) return modelCache;
+  const all = ((await gfetch("/models?pageSize=200")).models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent")).map(m => String(m.name).replace("models/", ""));
+  const byNew = (a, b) => ver(b) - ver(a) || Number(a.includes("preview")) - Number(b.includes("preview"));
+  const bad = /lite|tts|live|image|audio|transcribe|exp|embedding|native|computer|robotics/;
+  modelCache = {
+    text: all.filter(n => n.includes("flash") && !bad.test(n)).sort(byNew),
+    tts: all.filter(n => n.includes("tts") && n.includes("flash")).sort((a, b) => Number(a.includes("lite")) - Number(b.includes("lite")) || byNew(a, b)),
+  };
+  return modelCache;
+}
+async function firstThatWorks(list, bodies){
+  let last = new Error("no model available");
+  for(const m of list.slice(0, 3)) for(const body of bodies){
+    try { return await gfetch("/models/" + m + ":generateContent", body); }
+    catch(e){ last = e; if(/BAD_KEY|429/.test(e.message)) throw e; }
+  }
+  throw last;
+}
+const textOf = d => (((d.candidates || [])[0] || {}).content || {parts: []}).parts.map(p => p.text || "").join("");
+async function api(b){
+  if(!getKey()) throw new Error("NO_KEY");
+  const m = await models();
+  if(b.action === "ping") return {ok: true, text: m.text[0] || null, tts: m.tts[0] || null};
+  if(b.action === "turn"){
+    const mode = MODE[b.mode] ? b.mode : "stage";
+    const ctxText = [MODE[mode], b.task ? "The task she was given: " + String(b.task).slice(0, 600) : "", b.focus ? "Her current training focus: " + String(b.focus).slice(0, 200) + ". Weight your feedback toward it." : "", b.history ? "Recent conversation (oldest first):\n" + String(b.history).slice(-2500) : ""].filter(Boolean).join("\n");
+    const d = await firstThatWorks(m.text, [{
+      systemInstruction: {parts: [{text: COACH}]},
+      contents: [{role: "user", parts: [{text: ctxText}, {inline_data: {mime_type: b.mime || "audio/wav", data: b.audio}}]}],
+      generationConfig: {responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 1800, temperature: 0.4},
+    }]);
+    return JSON.parse(textOf(d));
+  }
+  if(b.action === "summary"){
+    const d = await firstThatWorks(m.text, [{
+      systemInstruction: {parts: [{text: "You are a strict speaking coach. Return only JSON."}]},
+      contents: [{role: "user", parts: [{text: "Here are the results of the student's baseline assessment (JSON):\n" + JSON.stringify(b.results).slice(0, 9000) + "\nChoose the ONE focus that will improve her speaking the most in the next two weeks. Return JSON: {focus: short English name of the focus (max 8 words), why_hebrew: two short Hebrew sentences without dashes explaining why this and not the others, drill: one concrete daily drill in simple English (max 30 words)}"}]}],
+      generationConfig: {responseMimeType: "application/json", maxOutputTokens: 500, temperature: 0.3},
+    }]);
+    return JSON.parse(textOf(d));
+  }
+  if(b.action === "tts"){
+    const text = String(b.text || "").slice(0, 900), voice = "Kore";
+    const d = await firstThatWorks(m.tts, [
+      {contents: [{parts: [{text}]}], generationConfig: {responseModalities: ["AUDIO"], speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}}}},
+      {contents: [{parts: [{text}]}], generationConfig: {responseModalities: ["AUDIO"], speechConfig: {voiceConfig: {voice}}}},
+    ]);
+    const part = ((((d.candidates || [])[0] || {}).content || {}).parts || []).find(p => p.inlineData || p.inline_data);
+    const a = part && (part.inlineData || part.inline_data);
+    if(!a || !a.data) throw new Error("no audio returned");
+    return {audio: a.data, mime: a.mimeType || a.mime_type || "audio/L16;rate=24000"};
+  }
+  throw new Error("unknown action");
+}
+function showErr(e){
+  const m = String(e && e.message || e);
+  let he = "משהו השתבש: " + m;
+  if(m.includes("NO_KEY")){ openKey(); return; }
+  else if(m.includes("BAD_KEY")){ openKey("המפתח שנשמר לא תקין. צריך להדביק מפתח חדש."); return; }
+  else if(m.includes("429")) he = "המכסה החינמית של Gemini נגמרה לרגע. אפשר לנסות שוב בעוד דקה.";
+  else if(m.includes("BAD_AUDIO")) he = "ההקלטה ריקה או ארוכה מדי. אפשר לנסות שוב.";
+  else if(m.includes("Failed to fetch")) he = "אין חיבור לשרת. כדאי לבדוק את האינטרנט ולנסות שוב.";
+  $("err").textContent = he; $("err").classList.remove("hide");
+  window.scrollTo(0,0);
+}
+const clearErr = () => $("err").classList.add("hide");
+
+/* ---------- audio out ---------- */
+let actx = null, playing = null;
+function ctx(){ if(!actx){ const C = window.AudioContext || window.webkitAudioContext; actx = new C(); } if(actx.state === "suspended") actx.resume(); return actx; }
+function b64bytes(b64){ const s = atob(b64); const u = new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+async function playB64(audio, mime){
+  const c = ctx(); let buf;
+  if(/L16|pcm/i.test(mime)){
+    const rate = parseInt((mime.match(/rate=(\d+)/)||[])[1] || "24000", 10);
+    const u = b64bytes(audio); const n = Math.floor(u.length/2); const dv = new DataView(u.buffer);
+    buf = c.createBuffer(1, n, rate); const ch = buf.getChannelData(0);
+    for(let i=0;i<n;i++) ch[i] = dv.getInt16(i*2, true) / 32768;
+  } else {
+    buf = await c.decodeAudioData(b64bytes(audio).buffer);
+  }
+  stopPlay(); const src = c.createBufferSource(); src.buffer = buf; src.connect(c.destination); src.start(); playing = src;
+}
+function stopPlay(){ try{ if(playing) playing.stop(); }catch(e){} playing = null; try{ speechSynthesis.cancel(); }catch(e){} }
+const ttsCache = {};
+async function say(text, btn){
+  if(!text) return;
+  const old = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "טוען קול"; }
+  try{
+    ctx();
+    if(!ttsCache[text]) ttsCache[text] = await api({action:"tts", text});
+    await playB64(ttsCache[text].audio, ttsCache[text].mime);
+  }catch(e){
+    // fallback: the phone's own English voice, so the session is not blocked
+    try{ const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; u.rate = 0.95; speechSynthesis.speak(u); }catch(e2){ showErr(e); }
+  }finally{ if(btn){ btn.disabled = false; btn.textContent = old; } }
+}
+
+/* ---------- recording (16 kHz mono WAV, works on iPhone and Android) ---------- */
+let rec = null;
+async function startRec(maxSec){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}});
+  const c = ctx(); const src = c.createMediaStreamSource(stream);
+  const proc = c.createScriptProcessor(4096, 1, 1); const mute = c.createGain(); mute.gain.value = 0;
+  const chunks = []; let n = 0;
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d)); n += d.length;
+    let s = 0; for(let i=0;i<d.length;i+=16) s += d[i]*d[i];
+    $("level").style.width = Math.min(100, Math.sqrt(s/(d.length/16))*400) + "%";
+  };
+  src.connect(proc); proc.connect(mute); mute.connect(c.destination);
+  const t0 = Date.now();
+  const tick = setInterval(() => {
+    const s = Math.floor((Date.now()-t0)/1000);
+    $("timer").textContent = Math.floor(s/60) + ":" + String(s%60).padStart(2,"0") + " / " + Math.floor(maxSec/60) + ":" + String(maxSec%60).padStart(2,"0");
+    if(s >= maxSec) stopAndSend();
+  }, 250);
+  rec = {stream, src, proc, mute, chunks, rate:c.sampleRate, tick, len:() => n, t0};
+}
+function stopRec(){
+  if(!rec) return null; const r = rec; rec = null; clearInterval(r.tick);
+  try{ r.proc.disconnect(); r.src.disconnect(); r.mute.disconnect(); }catch(e){}
+  r.stream.getTracks().forEach(t => t.stop()); $("level").style.width = "0";
+  const total = r.len(); const all = new Float32Array(total); let o = 0; for(const c of r.chunks){ all.set(c, o); o += c.length; }
+  const ratio = r.rate / 16000; const outN = Math.floor(total / ratio); const pcm = new Int16Array(outN);
+  for(let i=0;i<outN;i++){
+    const a = Math.floor(i*ratio), b = Math.min(total, Math.floor((i+1)*ratio)); let s = 0;
+    for(let k=a;k<b;k++) s += all[k];
+    const v = Math.max(-1, Math.min(1, s / Math.max(1, b-a))); pcm[i] = v < 0 ? v*32768 : v*32767;
+  }
+  const buf = new ArrayBuffer(44 + pcm.length*2); const dv = new DataView(buf);
+  const W = (p,s) => { for(let i=0;i<s.length;i++) dv.setUint8(p+i, s.charCodeAt(i)); };
+  W(0,"RIFF"); dv.setUint32(4, 36+pcm.length*2, true); W(8,"WAVEfmt "); dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+  dv.setUint32(24,16000,true); dv.setUint32(28,32000,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true); W(36,"data"); dv.setUint32(40, pcm.length*2, true);
+  new Int16Array(buf, 44).set(pcm);
+  const u = new Uint8Array(buf); let bin = ""; for(let i=0;i<u.length;i+=0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i+0x8000));
+  return {b64: btoa(bin), sec: outN/16000};
+}
+
+/* ---------- screens ---------- */
+function show(id){ ["keyScreen","home","stagePick","session","done"].forEach(s => $(s).classList.toggle("hide", s !== id)); window.scrollTo(0,0); }
+function goHome(){ if(rec) stopRec(); stopPlay(); clearErr(); renderHome(); show("home"); }
+function renderHome(){
+  if(store.focus){ $("focusCard").classList.remove("hide"); $("focusName").textContent = store.focus.focus || ""; $("focusWhy").textContent = store.focus.why_hebrew || ""; $("focusDrill").textContent = store.focus.drill || ""; }
+  const h = $("history"); const list = (store.sessions || []).slice(-8).reverse();
+  if(!list.length){ h.textContent = "עוד אין אימונים."; return; }
+  h.innerHTML = "";
+  for(const s of list){
+    const d = document.createElement("div"); d.className = "hist";
+    const dt = new Date(s.t); const sc = s.scores || {};
+    d.textContent = dt.toLocaleDateString("he-IL") + " · " + s.name + " · שטף " + (sc.fluency ?? "-") + ", הגייה " + (sc.pronunciation ?? "-") + ", הגשה " + (sc.delivery ?? "-") + ", מבנה " + (sc.structure ?? "-");
+    h.appendChild(d);
+  }
+}
+function startRun(kind, items){ runKind = kind; queue = items; qi = 0; assessResults = []; lessonHist = []; loadTask(); show("session"); }
+function loadTask(){
+  cur = queue[qi]; last = null; clearErr();
+  $("stepLabel").textContent = cur.label || (runKind === "lesson" ? "מצב שיעור: תור " + (lessonHist.length/2 + 1 | 0) : "מצב במה: " + (cur.he || ""));
+  $("taskText").textContent = cur.task;
+  $("passage").classList.toggle("hide", !cur.passage); $("passage").textContent = cur.passage || "";
+  $("hearTask").classList.toggle("hide", !cur.hear);
+  $("result").classList.add("hide"); $("busy").classList.add("hide"); $("recCard").classList.remove("hide");
+  $("recBtn").classList.remove("on"); $("recBtn").textContent = "להתחיל לדבר"; $("recBtn").disabled = false;
+  $("timer").textContent = "0:00"; $("recHint").textContent = "עד " + cur.sec + " שניות. לוחצים שוב כדי לסיים.";
+  $("next").textContent = runKind === "assess" ? (qi < queue.length-1 ? "למשימה הבאה" : "לסיכום המבחן") : (runKind === "lesson" ? "לענות למאמן" : (cur.mode === "qa" ? "לענות לשאלה הבאה" : "לבחור קטע אחר"));
+  $("again").classList.toggle("hide", runKind === "lesson" || runKind === "assess");
+}
+async function toggleRec(){
+  clearErr();
+  if(!rec){
+    stopPlay();
+    try{ await startRec(cur.sec); }catch(e){ showErr(new Error("אין גישה למיקרופון. צריך לאשר מיקרופון לדף הזה בהגדרות הדפדפן.")); return; }
+    $("recBtn").classList.add("on"); $("recBtn").textContent = "סיימתי";
+  } else { stopAndSend(); }
+}
+async function stopAndSend(){
+  const a = stopRec(); if(!a) return;
+  $("recBtn").classList.remove("on"); $("recBtn").textContent = "להתחיל לדבר";
+  if(a.sec < 2){ showErr(new Error("BAD_AUDIO")); return; }
+  $("recCard").classList.add("hide"); $("busy").classList.remove("hide");
+  try{
+    const body = {action:"turn", mode:cur.mode, audio:a.b64, mime:"audio/wav", task:cur.task + (cur.passage ? " Passage: " + cur.passage : ""), focus:store.focus ? store.focus.focus : ""};
+    if(runKind === "lesson" || cur.mode === "qa") body.history = lessonHist.join("\n");
+    const r = await api(body); last = r; renderResult(r);
+    store.sessions.push({t:Date.now(), name: runKind === "assess" ? "מבחן פתיחה" : runKind === "lesson" ? "שיעור" : (cur.he || "במה"), scores:r.scores, top_fix:r.top_fix});
+    store.sessions = store.sessions.slice(-60); save();
+    if(runKind === "assess") assessResults.push({task:cur.task, scores:r.scores, top_fix:r.top_fix, pronunciation:r.pronunciation, transcript:r.transcript});
+    if(runKind === "lesson" || cur.mode === "qa"){ lessonHist.push("Student: " + r.transcript, "Coach: " + r.coach_says); lessonHist = lessonHist.slice(-10); }
+    say(r.coach_says);
+  }catch(e){ $("busy").classList.add("hide"); $("recCard").classList.remove("hide"); showErr(e); }
+}
+function renderResult(r){
+  $("busy").classList.add("hide"); $("result").classList.remove("hide");
+  $("coachSays").textContent = r.coach_says || ""; $("topFix").textContent = r.top_fix || ""; $("heNote").textContent = r.hebrew_note || "";
+  const sc = $("scores"); sc.innerHTML = "";
+  for(const k of Object.keys(SCORE_HE)){
+    const v = Math.max(0, Math.min(10, Number((r.scores||{})[k]) || 0));
+    const row = document.createElement("div"); row.className = "bar";
+    row.innerHTML = "<label></label><div class='t'><i></i></div><b></b>";
+    row.children[0].textContent = SCORE_HE[k]; row.children[1].firstChild.style.width = (v*10) + "%"; row.children[2].textContent = v;
+    sc.appendChild(row);
+  }
+  const p = $("pron"); p.innerHTML = ""; const items = r.pronunciation || [];
+  if(!items.length){ p.textContent = "לא נשמעו מילים בעייתיות בקטע הזה."; }
+  for(const it of items){
+    const w = document.createElement("div"); w.className = "word";
+    const d = document.createElement("div"); d.className = "en";
+    const b = document.createElement("b"); b.textContent = it.word || ""; d.appendChild(b);
+    if(it.heard){ const s = document.createElement("div"); s.className = "sub"; s.textContent = "Heard: " + it.heard; d.appendChild(s); }
+    const t = document.createElement("div"); t.textContent = it.tip || ""; d.appendChild(t);
+    const btn = document.createElement("button"); btn.className = "sec small"; btn.textContent = "השמעה"; btn.onclick = () => say(it.word, btn);
+    w.appendChild(d); w.appendChild(btn); p.appendChild(w);
+  }
+  $("better").textContent = r.better_version || ""; $("transcript").textContent = r.transcript || "";
+}
+async function nextStep(){
+  stopPlay();
+  if(runKind === "assess"){
+    if(qi < queue.length-1){ qi++; loadTask(); return; }
+    show("done"); $("doneBody").className = "spin"; $("doneBody").textContent = "מסכם את התוצאות.";
+    try{
+      const f = await api({action:"summary", results:assessResults}); store.focus = f; save();
+      const b = $("doneBody"); b.className = ""; b.innerHTML = "<p><b>המיקוד לשבועיים הקרובים</b></p><p class='en' style='font-weight:600'></p><p></p><p class='en sub'></p>";
+      b.children[1].textContent = f.focus || ""; b.children[2].textContent = f.why_hebrew || ""; b.children[3].textContent = f.drill || "";
+    }catch(e){ $("doneBody").className = ""; $("doneBody").textContent = "התוצאות נשמרו, אבל הסיכום לא נוצר. אפשר לחזור על המבחן מאוחר יותר."; showErr(e); }
+    return;
+  }
+  if(runKind === "lesson" || cur.mode === "qa"){
+    cur = Object.assign({}, cur, {task: last ? last.coach_says : cur.task, hear:true}); queue = [cur]; qi = 0; loadTask(); return;
+  }
+  renderSegs(); show("stagePick");
+}
+function renderSegs(){
+  const l = $("segList"); l.innerHTML = "";
+  SEGMENTS.forEach(s => { const b = document.createElement("button"); b.className = "mode"; b.innerHTML = "<b></b><span class='en' style='display:block'></span>"; b.children[0].textContent = s.he; b.children[1].textContent = s.task; b.onclick = () => { ctx(); startRun("stage", [s]); }; l.appendChild(b); });
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll("[data-home]").forEach(b => b.onclick = goHome);
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+  ctx(); clearErr(); const k = b.dataset.go;
+  if(k === "assess") startRun("assess", ASSESS);
+  if(k === "stage"){ renderSegs(); show("stagePick"); }
+  if(k === "lesson"){ startRun("lesson", [{mode:"lesson", sec:60, task:LESSON_OPEN, hear:true}]); say(LESSON_OPEN); }
+});
+$("recBtn").onclick = toggleRec;
+$("hearTask").onclick = () => say(cur.task, $("hearTask"));
+$("hearCoach").onclick = () => say(last && last.coach_says, $("hearCoach"));
+$("hearBetter").onclick = () => say(last && last.better_version, $("hearBetter"));
+$("again").onclick = () => { stopPlay(); loadTask(); };
+$("next").onclick = nextStep;
+function openKey(msg){ if(rec) stopRec(); stopPlay(); clearErr(); if(msg) $("keyMsg").textContent = msg; show("keyScreen"); }
+$("keyChange").onclick = () => openKey();
+$("keySave").onclick = async () => {
+  const k = $("keyInput").value.trim(); if(!k) return;
+  const b = $("keySave"); b.disabled = true; b.textContent = "בודק";
+  try{ localStorage.setItem("coach_key", k); }catch(e){}
+  modelCache = null;
+  try{
+    const p = await api({action:"ping"});
+    if(!p.text) throw new Error("לא נמצא מודל מתאים בחשבון הזה.");
+    $("keyInput").value = ""; goHome();
+  }catch(e){
+    try{ localStorage.removeItem("coach_key"); }catch(e2){}
+    $("keyMsg").textContent = /BAD_KEY/.test(e.message) ? "המפתח לא התקבל. כדאי להעתיק אותו שוב במלואו." : "הבדיקה נכשלה: " + e.message;
+  }finally{ b.disabled = false; b.textContent = "שמירה ובדיקה"; }
+};
+renderHome();
+if(!getKey()) openKey(); else api({action:"ping"}).catch(showErr);
+</script>
+</body>
+</html>
