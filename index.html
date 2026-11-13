@@ -326,7 +326,7 @@ async function api(b){
   if(b.action === "fresh"){
     const d = await firstThatWorks(m.fast, [{
       systemInstruction: {parts: [{text: "You write practice material for a speaker rehearsing an English keynote about body awareness, healing and inner listening. Return only JSON."}]},
-      contents: [{role: "user", parts: [{text: "Create new practice material. Return JSON: {passage: a 55 to 70 word paragraph that sounds like part of a warm, calm keynote, in simple spoken English, with several th, r, w and v sounds and at least one short sentence, talk: a one-minute speaking prompt about her talk or her work that starts with 'In one minute,', question: one realistic question an audience member would ask, without quotation marks}. Make it clearly different in topic and wording from these recent ones: " + String(b.avoid || "none").slice(0, 1500)}]}],
+      contents: [{role: "user", parts: [{text: "Create new practice material. Return JSON: {passage: a paragraph of at least 55 and at most 70 words (count the words, fewer than 55 is not acceptable) that sounds like part of a warm, calm keynote, in simple spoken English, with several th, r, w and v sounds and at least one short sentence, talk: a one-minute speaking prompt about her talk or her work that starts with 'In one minute,', question: one realistic question an audience member would ask, without quotation marks}. Make it clearly different in topic and wording from these recent ones: " + String(b.avoid || "none").slice(0, 1500)}]}],
       generationConfig: {responseMimeType: "application/json", maxOutputTokens: 3000, temperature: 1.0},
     }], "", 15000);
     return JSON.parse(textOf(d));
@@ -557,6 +557,7 @@ document.querySelectorAll("[data-go]").forEach(b => b.onclick = async () => {
     const sp = b.querySelector("span"), old = sp.textContent; b.disabled = true; sp.textContent = "מכין משימות חדשות. כמה שניות.";
     store.recent = store.recent || {}; let g = null;
     try{ g = await api({action:"fresh", avoid:(store.recent.gen || []).join(" | ")}); }catch(e){}
+    if(g && g.passage && String(g.passage).trim().split(/\s+/).length < 45) g.passage = pick("p", PASSAGES);
     if(g && g.passage && g.talk && g.question){ store.recent.gen = (store.recent.gen || []).concat([String(g.passage).slice(0, 70), g.talk, g.question]).slice(-18); save(); }
     else g = {passage:pick("p", PASSAGES), talk:pick("t", TALKS), question:pick("q", QUESTIONS)};
     b.disabled = false; sp.textContent = old;
