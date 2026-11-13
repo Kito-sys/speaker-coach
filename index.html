@@ -108,6 +108,7 @@ button:disabled{opacity:.5}
         <button class="sec small" id="hearCoach">השמעה חוזרת</button>
         <div class="fix"><b>התיקון הכי חשוב</b><p class="en" id="topFix" style="margin:6px 0"></p><p id="heNote" style="margin:0"></p></div>
         <div id="scores"></div>
+        <p class="sub en" id="modelNote" style="margin:8px 0 0"></p>
       </div>
       <div class="card" id="pronCard"><h2>הגייה</h2><div id="pron"></div></div>
       <div class="card"><h2>כך מרצה מנוסה היה אומר את זה</h2><p class="en" id="better"></p><button class="sec small" id="hearBetter">השמעה</button></div>
@@ -212,15 +213,14 @@ let queue = [], qi = 0, cur = null, last = null, lessonHist = [], assessResults 
 /* ---------- Gemini, called straight from this device. The key is saved only in this browser. ---------- */
 const API = "https://generativelanguage.googleapis.com/v1beta";
 const getKey = () => { try { return localStorage.getItem("coach_key") || ""; } catch(e){ return ""; } };
-const COACH = `You are a world-class public speaking coach and English teacher for one student: a native Hebrew speaker and author who is becoming an international speaker. Her signature talk is called "Magnetic Medicine". Her target standard is a calm, authoritative, story-driven keynote speaker who makes complex ideas simple and speaks slowly with intention.
+const COACH = `You are a world-class public speaking coach and English teacher for one student: an author who is becoming an international speaker. Her signature talk is called "Magnetic Medicine". Her target standard is a calm, authoritative, story-driven keynote speaker who makes complex ideas simple and speaks slowly with intention.
 You LISTEN to the audio itself. Judge what you actually hear: sounds, word stress, rhythm, pace, pauses, intonation, filler words, energy. Never invent problems you did not hear. If the audio is silent or unintelligible, say so in coach_says and give empty lists.
-Typical issues for Hebrew speakers to listen for: th sounds, r, w versus v, short versus long vowels (ship/sheep), final consonant clusters, word stress, flat or rising sentence endings, speaking too fast, translating Hebrew sentence structure.
 Be direct and specific. No flattery. Praise only what was truly strong, in one short phrase.
 Return ONLY JSON with these fields:
 transcript: exactly what she said.
 scores: integers 1-10 for fluency, pronunciation, delivery (pace, pauses, energy), structure (clarity, story, impact). 10 means an elite native keynote speaker.
 top_fix: the single most important thing to fix next attempt, one sentence in simple English.
-pronunciation: up to 5 items {word, heard, tip} for words that actually sounded off. tip is a short practical instruction.
+pronunciation: up to 5 items {word, heard, tip}, ONLY for words you are highly confident were mispronounced in this exact recording. An empty list is the correct and expected answer when the speech is clear. Never guess from who the speaker might be. tip is a short practical instruction.
 better_version: her same content rewritten the way a top native keynote speaker would say it. Keep her meaning and voice. Similar length.
 coach_says: what you say out loud to her now, in natural spoken English, maximum 60 words.
 hebrew_note: one short line in Hebrew (general plural or neutral phrasing, no dashes) explaining top_fix.`;
@@ -258,11 +258,14 @@ const SCHEMA = {
   required: ["transcript", "scores", "top_fix", "pronunciation", "better_version", "coach_says", "hebrew_note"],
 };
 let modelCache = null;
-const TMO = window.__TMO || 45000;
-const good = {};
+const TMO = window.__TMO || 30000;
+const good = {}, skipUntil = {};
+// Order set from a live test on 13.11.2026: the newest models hung or returned 503, these answered.
+const PREF_LISTEN = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest"];
+const PREF_TEXT = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash"];
 const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
-async function gfetch(path, body){
-  const ac = new AbortController(); const to = setTimeout(() => ac.abort(), body ? TMO : 15000);
+async function gfetch(path, body, ms){
+  const ac = new AbortController(); const to = setTimeout(() => ac.abort(), window.__TMO || ms || (body ? TMO : 15000));
   let r, t;
   try {
     r = await fetch(API + path, {method: body ? "POST" : "GET", headers: {"x-goog-api-key": getKey(), "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined, signal: ac.signal});
@@ -276,21 +279,30 @@ async function models(){
   if(modelCache) return modelCache;
   const all = ((await gfetch("/models?pageSize=200")).models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent")).map(m => String(m.name).replace("models/", ""));
   const byNew = (a, b) => ver(b) - ver(a) || Number(a.includes("preview")) - Number(b.includes("preview"));
-  const bad = /lite|tts|live|image|audio|transcribe|exp|embedding|native|computer|robotics/;
+  const bad = /tts|live|image|audio|transcribe|exp|embedding|native|computer|robotics|omni|latest|customtools/;
+  const rest = all.filter(n => n.includes("flash") && !bad.test(n)).sort(byNew);
+  const order = pref => pref.filter(n => all.includes(n)).concat(rest.filter(n => !pref.includes(n)));
   modelCache = {
-    text: all.filter(n => n.includes("flash") && !bad.test(n)).sort(byNew),
+    text: order(PREF_LISTEN), fast: order(PREF_TEXT),
     tts: all.filter(n => n.includes("tts") && n.includes("flash")).sort((a, b) => Number(a.includes("lite")) - Number(b.includes("lite")) || byNew(a, b)),
   };
   return modelCache;
 }
-async function firstThatWorks(list, bodies, kind){
-  let last = new Error("no model available");
-  const order = []; for(const m of list.slice(0, 3)) bodies.forEach((x, i) => order.push([m, i]));
-  const g = kind && good[kind]; const hit = o => g && o[0] === g[0] && o[1] === g[1];
-  if(g) order.sort((a, b) => Number(!hit(a)) - Number(!hit(b)));
-  for(const o of order){
-    try { const d = await gfetch("/models/" + o[0] + ":generateContent", bodies[o[1]]); if(kind) good[kind] = o; return d; }
-    catch(e){ last = e; if(/BAD_KEY|429|TIMEOUT|NET /.test(e.message)) throw e; }
+let lastModel = "";
+async function firstThatWorks(list, bodies, kind, ms){
+  let last = new Error("no model available"); const now = Date.now();
+  let cand = list.filter(m => !(skipUntil[m] > now)).slice(0, 4); if(!cand.length) cand = list.slice(0, 4);
+  for(const m of cand){
+    const idx = bodies.map((x, i) => i); const g = kind ? good[kind + m] : null; if(g != null) idx.sort((a, b) => Number(a !== g) - Number(b !== g));
+    for(const i of idx){
+      try { const d = await gfetch("/models/" + m + ":generateContent", bodies[i], ms); if(kind) good[kind + m] = i; lastModel = m; return d; }
+      catch(e){
+        last = e; const msg = String(e.message);
+        if(/BAD_KEY|NET /.test(msg)) throw e;
+        if(/TIMEOUT/.test(msg)){ skipUntil[m] = Date.now() + 300000; break; }
+        if(!/HTTP 400/.test(msg)) break;
+      }
+    }
   }
   throw last;
 }
@@ -305,34 +317,34 @@ async function api(b){
     const mk = extra => ({
       systemInstruction: {parts: [{text: COACH}]},
       contents: [{role: "user", parts: [{text: ctxText}, {inline_data: {mime_type: b.mime || "audio/wav", data: b.audio}}]}],
-      generationConfig: Object.assign({responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 4000, temperature: 0.4}, extra),
+      generationConfig: Object.assign({responseMimeType: "application/json", responseSchema: SCHEMA, maxOutputTokens: 4000, temperature: 0.2}, extra),
     });
     const d = await firstThatWorks(m.text, [mk({thinkingConfig: {thinkingBudget: 0}}), mk({})], "turn");
     const txt = textOf(d);
-    try { return JSON.parse(txt); } catch(e) { throw new Error("BAD_REPLY " + (((d.candidates || [])[0] || {}).finishReason || "") + " " + txt.slice(0, 80)); }
+    try { const o = JSON.parse(txt); o.model = lastModel; return o; } catch(e) { throw new Error("BAD_REPLY " + (((d.candidates || [])[0] || {}).finishReason || "") + " " + txt.slice(0, 80)); }
   }
   if(b.action === "fresh"){
-    const d = await firstThatWorks(m.text, [{
+    const d = await firstThatWorks(m.fast, [{
       systemInstruction: {parts: [{text: "You write practice material for a speaker rehearsing an English keynote about body awareness, healing and inner listening. Return only JSON."}]},
       contents: [{role: "user", parts: [{text: "Create new practice material. Return JSON: {passage: a 55 to 70 word paragraph that sounds like part of a warm, calm keynote, in simple spoken English, with several th, r, w and v sounds and at least one short sentence, talk: a one-minute speaking prompt about her talk or her work that starts with 'In one minute,', question: one realistic question an audience member would ask, without quotation marks}. Make it clearly different in topic and wording from these recent ones: " + String(b.avoid || "none").slice(0, 1500)}]}],
       generationConfig: {responseMimeType: "application/json", maxOutputTokens: 3000, temperature: 1.0},
-    }]);
+    }], "", 15000);
     return JSON.parse(textOf(d));
   }
   if(b.action === "summary"){
-    const d = await firstThatWorks(m.text, [{
+    const d = await firstThatWorks(m.fast, [{
       systemInstruction: {parts: [{text: "You are a strict speaking coach. Return only JSON."}]},
       contents: [{role: "user", parts: [{text: "Here are the results of the student's baseline assessment (JSON):\n" + JSON.stringify(b.results).slice(0, 9000) + "\nChoose the ONE focus that will improve her speaking the most in the next two weeks. Return JSON: {focus: short English name of the focus (max 8 words), why_hebrew: two short Hebrew sentences without dashes explaining why this and not the others, drill: one concrete daily drill in simple English (max 30 words)}"}]}],
       generationConfig: {responseMimeType: "application/json", maxOutputTokens: 3000, temperature: 0.3},
-    }]);
+    }], "", 20000);
     return JSON.parse(textOf(d));
   }
   if(b.action === "tts"){
-    const text = "Say in a calm, warm, clear voice: " + String(b.text || "").slice(0, 900), voice = "Kore";
+    const text = String(b.text || "").slice(0, 900), voice = "Kore";
     const d = await firstThatWorks(m.tts, [
       {contents: [{parts: [{text}]}], generationConfig: {responseModalities: ["AUDIO"], speechConfig: {voiceConfig: {prebuiltVoiceConfig: {voiceName: voice}}}}},
       {contents: [{parts: [{text}]}], generationConfig: {responseModalities: ["AUDIO"], speechConfig: {voiceConfig: {voice}}}},
-    ], "tts");
+    ], "tts", 20000);
     const part = ((((d.candidates || [])[0] || {}).content || {}).parts || []).find(p => p.inlineData || p.inline_data);
     const a = part && (part.inlineData || part.inline_data);
     if(!a || !a.data) throw new Error("no audio returned");
@@ -347,7 +359,8 @@ function showErr(e){
   else if(m.includes("BAD_KEY")){ openKey("המפתח שנשמר לא תקין. צריך להדביק מפתח חדש."); return; }
   else if(m.includes("429")) he = "המכסה החינמית של Gemini נגמרה לרגע. אפשר לנסות שוב בעוד דקה.";
   else if(m.includes("BAD_AUDIO")) he = "ההקלטה ריקה או ארוכה מדי. אפשר לנסות שוב.";
-  else if(m.includes("TIMEOUT")) he = "Gemini לא ענה בתוך 45 שניות. אפשר לנסות שוב עם הקלטה קצרה יותר. פרטים: " + m;
+  else if(m.includes("TIMEOUT")) he = "אף מודל של Gemini לא ענה בזמן. אפשר ללחוץ על שליחה חוזרת בעוד דקה. פרטים: " + m;
+  else if(m.includes("HTTP 503")) he = "המודלים של Gemini עמוסים כרגע. אפשר ללחוץ על שליחה חוזרת בעוד דקה. פרטים: " + m.slice(0, 60);
   else if(m.includes("NET ")) he = "אין חיבור ל-Gemini. כדאי לבדוק את האינטרנט ולנסות שוב. פרטים: " + m;
   else if(m.includes("BAD_REPLY")) he = "Gemini החזיר תשובה לא שלמה. אפשר לנסות שוב. פרטים: " + m;
   $("err").textContent = he; $("err").classList.remove("hide");
@@ -500,6 +513,7 @@ function renderResult(r){
     row.children[0].textContent = SCORE_HE[k]; row.children[1].firstChild.style.width = (v*10) + "%"; row.children[2].textContent = v;
     sc.appendChild(row);
   }
+  $("modelNote").textContent = r.model ? "Listened: " + r.model + (/lite/.test(r.model) ? " (light model, pronunciation feedback is less reliable)" : "") : "";
   const p = $("pron"); p.innerHTML = ""; const items = r.pronunciation || [];
   if(!items.length){ p.textContent = "לא נשמעו מילים בעייתיות בקטע הזה."; }
   for(const it of items){
